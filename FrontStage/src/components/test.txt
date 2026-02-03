@@ -1,0 +1,133 @@
+import { BiSearchAlt2 } from "react-icons/bi";
+import { BiTrashAlt } from "react-icons/bi";
+import { FiEdit2 } from "react-icons/fi";
+import { useState, useEffect } from "react";
+import Modal from "./client/Modal";
+import axios from "axios";
+import { HOST_API } from "../Global";
+import RootPage from "./RootPage";
+import TitlePage from "./TitlePage";
+
+export default function Clients() {
+  const [isOpenModal, setOpenModal] = useState(false);
+  const [clients, setClients] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const role = localStorage.getItem("role");
+
+  useEffect(() => {
+    fetchClients();
+  }, []);
+
+  async function fetchClients() {
+    const res = await axios.get(`${HOST_API}/clients/`);
+    setClients(res.data);
+  }
+
+  function handleDelete(client) {
+    axios.delete(`${HOST_API}/clients/${client.id}/`).then(fetchClients);
+  }
+
+  const handleDownloadPDF = async () => {
+    try {
+      const response = await axios.get(`${HOST_API}/generate-pdf-clients/`, {
+        responseType: 'blob',
+        headers: {
+          'Accept': 'application/pdf'
+        }
+      });
+
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'liste_clients_fianarantsoa.pdf');
+      document.body.appendChild(link);
+      link.click();
+
+      // Nettoyage
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Erreur lors du téléchargement du PDF:', error);
+      alert('Erreur lors de la génération du PDF. Veuillez réessayer.');
+    }
+  };
+
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value);
+  };
+
+  const filteredClients = clients.filter(client =>
+    client.nom.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <RootPage>
+      <div className="d-flex justify-content-between">
+        <TitlePage className="fs-2">GESTION DE CLIENTS</TitlePage>
+        <form>
+          <div className="input-group mb-3">
+            <span className="input-group-text">
+              <BiSearchAlt2 />
+            </span>
+            <input 
+              type="text" 
+              className="form-control" 
+              placeholder="Nom du client" 
+              value={searchTerm}
+              onChange={handleSearch}
+              aria-label="Rechercher un client" 
+            />
+          </div>
+        </form>
+      </div>
+      <div className="d-flex justify-content-end gap-2 mb-3">
+        {role === "r" && (
+          <>
+            <button className="btn btn-primary" onClick={() => setOpenModal(true)}>
+              Ajouter un client
+            </button>
+            <button className="btn btn-success" onClick={handleDownloadPDF}>
+              Générer un PDF
+            </button>
+          </>
+        )}
+        <Modal isOpenModal={isOpenModal} setOpenModal={setOpenModal} loader={fetchClients} />
+      </div>
+      <table className="table">
+        <thead>
+          <tr>
+            <th scope="col">#</th>
+            <th scope="col">Nom</th>
+            <th scope="col">Address</th>
+            <th scope="col">Tel</th>
+            <th scope="col">secteur</th>
+            {role === "r" && <th scope="col"></th>}
+          </tr>
+        </thead>
+        <tbody>
+          {filteredClients.map((client, i) => (
+            <tr key={i}>
+              <td>{client.id}</td>
+              <td>{client.nom}</td>
+              <td>{client.adresse}</td>
+              <td>{client.telephone}</td>
+              <td>{client.recette}</td>
+              {role === "r" && (
+                <td className="d-flex justify-content-between gap-1">
+                  <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(client)}>
+                    <BiTrashAlt />
+                  </button>
+                  <button className="btn btn-sm btn-outline-secondary">
+                    <FiEdit2 />
+                  </button>
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </RootPage>
+  );
+}
